@@ -1047,7 +1047,6 @@ def single_island(param_pop, island_weights):
         write_generation(new_population)
 
 
-    
     # Generating wav file section, seperate from actual GA loop
 
     if(dont_generate_files):
