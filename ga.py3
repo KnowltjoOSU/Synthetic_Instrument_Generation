@@ -26,7 +26,7 @@ loops = 10
 chance = 1
 
 # Used to determine how many fitness helper we have in total
-num_funcs = 17
+num_funcs = 22
 
 # Used to scale how aggresively the mutation function changes the genes
 mutate_scalar = 0.05
@@ -47,10 +47,13 @@ selected_mutation = 1
 dont_generate_files = True
 
 # Number of islands in representation
-num_isles = 10
+num_isles = 20
 
 # Boolean that switches between sound version (floats) and instrument version (ratios)
 sound_mode = False
+
+# Used for generating wav files so we can better understand the meaningful differences between the sounds
+universal_base_freq = 260
 
 
 # Making an ideal set, used for dummy fitness function
@@ -169,6 +172,26 @@ helper.weights[16] = 0.0333
 helper.funcs[16] = "reward_transients(population, scores, helper.weights[16], island_weights)"
 helper.on_off_switch[16] = True
 
+helper.weights[17] = 20.0
+helper.funcs[17] = "reward_sparseness(population, scores, helper.weights[17], island_weights)"
+helper.on_off_switch[17] = True
+
+helper.weights[18] = 0.2
+helper.funcs[18] = "avoid_too_quiet(population, scores, helper.weights[18], island_weights)"
+helper.on_off_switch[18] = True
+
+helper.weights[19] = 1.0
+helper.funcs[19] = "check_decreasing_amps(population, scores, helper.weights[19], island_weights)"
+helper.on_off_switch[19] = True
+
+helper.weights[20] = 1.0
+helper.funcs[20] = "fundamental_freq_amp(population, scores, helper.weights[20], island_weights)"
+helper.on_off_switch[20] = True
+
+helper.weights[21] = 1.0
+helper.funcs[21] = "inverse_squared_amp(population, scores, helper.weights[21], island_weights)"
+helper.on_off_switch[21] = True
+
 
 # Set up for choosing crossover
 # In main function, will use eval to run one of these functions stored in the list
@@ -229,7 +252,7 @@ def check_bad_amps(population, scores, weight, island_weights):
         amplitude = population[i][1]
 
         for j in range(gene_length):
-            if(amplitude[j] < 0.3):
+            if(amplitude[j] < 0.18):
                 # Increase score if amplitude is not "too loud"
                 temp_score = temp_score + 1
 
@@ -251,6 +274,8 @@ def check_increasing_harmonics(population, scores, weight, island_weights):
         # Takes array of harmonics from population array
         frequency = population[i][0] 
 
+        #frequency.sort()
+
         # Current method only checks adjacent harmonics
         for j in range(gene_length - 1):
             if(frequency[j] < frequency[j + 1]):
@@ -268,9 +293,7 @@ def check_true_harmonics(population, scores, weight, island_weights):
 
     temp_score = 0
 
-    # for some reason this is looping 16 times instead of 8
-    # ACTUALLY THERE APPEARS TO BE AN INFINITE LOOP somewhere
-    # problem seems to lie with functions that reference base_freq as the 7th element in population array
+    
     for i in range(mems_per_pop):
 
         # Take the first frequency in the harmonics array of one member
@@ -394,9 +417,12 @@ def amps_sum(population, scores, weight, island_weights):
         for j in range(gene_length):
             amp_sum += population[i][1][j]
 
-        while(amp_sum > 1):
+        # while(amp_sum > 1):
+        #     scores[i] -= 1 * weight * island_weights[i]
+        #     amp_sum -= 1
+
+        if(amp_sum > 1):
             scores[i] -= 1 * weight * island_weights[i]
-            amp_sum -= 1
 
     # actually shouldn't need to return scores in helper fitness functions
     return scores
@@ -618,6 +644,115 @@ def reward_transients(population, scores, weight, island_weights):
     return scores
 
 
+def reward_sparseness(population, scores, weight, island_weights):
+
+    # checks and rewards a more consistent set of amplitudes instead of one central amplitude
+    # uses standard deviation to calculate consistency
+
+    
+
+    for i in range(mems_per_pop):
+        amp_mean = 0
+        temp = 0
+        amps = population[i][1]
+
+        for j in amps:
+            amp_mean += j
+
+        amp_mean /= gene_length
+
+        for j in amps:
+            temp += math.pow(j - amp_mean, 2)
+
+        temp /= gene_length
+        temp = math.sqrt(temp)
+
+        scores[i] -= temp * weight * island_weights[i] 
+
+
+    return scores
+
+
+def avoid_too_quiet(population, scores, weight, island_weights):
+
+    # checks and rewards each amp above a certain threshold 
+
+    temp = 0
+
+    for i in range(mems_per_pop):
+
+        amps = population[i][1]
+
+        for j in amps:
+            if(j > 0.05):
+                temp += 1
+
+        scores[i] += temp * weight * island_weights[i]
+
+        temp = 0
+
+    return scores
+
+
+def check_decreasing_amps(population, scores, weight, island_weights):
+
+    temp_score = 0
+
+    for i in range(mems_per_pop):
+        # Takes array of harmonics from population array
+        frequency = population[i][0]
+        amplitudes = population[i][1] 
+
+
+        # Current method only checks adjacent harmonics
+        for j in range(gene_length - 1):
+            if(frequency[j] < frequency[j + 1] and amplitudes[j] > amplitudes[j + 1]):
+                temp_score = temp_score + 1
+
+        scores[i] += temp_score * weight * island_weights[i]
+        temp_score = 0
+
+    return scores
+
+
+def fundamental_freq_amp(population, scores, weight, island_weights):
+
+    # punishes any partial that is louder than the base freq/fundamental freq
+
+    for i in range(mems_per_pop):
+
+        # will need to search through each amplitude of each member
+        amplitude = population[i][1]
+
+        for j in range(gene_length - 1):
+
+            if amplitude[j + 1] > amplitude[0]:
+                scores[i] -= 0.5 * weight * island_weights[i]
+
+    return scores
+
+
+
+def inverse_squared_amp(population, scores, weight, island_weights):
+
+    # Rewards functions that amps are closer to equaling 1/(index^2)
+    # Takes the difference between the actual value and 1/(index^2)
+
+    for i in range(mems_per_pop):
+
+        amplitude = population[i][1]
+
+        for j in range(gene_length):
+
+            ideal_amp = 1 / pow(j + 1, 2)
+            temp_score = abs(ideal_amp - amplitude[j])
+            scores -= temp_score * weight * island_weights[i]
+
+    return scores
+
+
+
+
 
 # Due to the random nature, maybe have it so it's within a range instead of an exact ratio 
 
@@ -788,9 +923,6 @@ def uniform_crossover(parents):
         parent1 = parents[c]
         parent2 = parents[c + 1]
 
-<<<<<<< Updated upstream
-        for i in range(num_genes):
-=======
 
         if(sound_mode):
             num_loops = num_genes
@@ -798,7 +930,7 @@ def uniform_crossover(parents):
             num_loops = num_genes + 1
 
         for i in range(num_loops):
->>>>>>> Stashed changes
+
 
             # Flip a coin to determine which parent is picked
             coin = random.randint(0, 1)
@@ -1066,21 +1198,21 @@ def intial_gen():
 
     for i in range(mems_per_pop):
 
-        
-        m = numpy.random.uniform(low=0.0, high=0.2, size=gene_length)
+        # may want to change amplitude range, but that runs the risk of peaking 
+        m = numpy.random.uniform(low=0.0, high=0.3, size=gene_length)
         a = numpy.random.uniform(low=0.0, high=0.2, size=gene_length)
         d = numpy.random.uniform(low=0.0, high=0.2, size=gene_length)
         s = numpy.random.uniform(low=0.0, high=1.0, size=gene_length)
         r = numpy.random.uniform(low=0.0, high=3.0, size=gene_length)
 
         if(sound_mode):
-            h = numpy.random.uniform(low=0.0, high=2500.0, size=gene_length)
+            h = numpy.random.uniform(low=50.0, high=2500.0, size=gene_length)
             new_population[i] = [h, m, a, d, s, r]
         else:
             h = numpy.random.uniform(low=1.0, high=15.0, size=gene_length)
             h = numpy.sort(h)
             h[0] = 1.0
-            base_freq = random.uniform(0.0, 2500.0)
+            base_freq = random.uniform(50.0, 170.0)
             # The base freq index will be equal to the value num_genes
             new_population[i] = [h, m, a, d, s, r, base_freq]
 
@@ -1281,7 +1413,9 @@ def single_island(param_pop, island_weights):
             for w in range(gene_length):
                 #print(new_population[c])
                 #frequencies[w] = new_population[c][0][w] 
-                frequencies[w] = new_population[c][0][w] * new_population[c][num_genes]
+
+                #frequencies[w] = new_population[c][0][w] * new_population[c][num_genes]
+                frequencies[w] = new_population[c][0][w] * universal_base_freq
                 #print(frequencies[w])
             newSound = sound_generation.instrument(frequencies, new_population[c][1], new_population[c][2], new_population[c][3], new_population[c][4], new_population[c][5], gene_length, names[c], directory_name)
 
@@ -1317,9 +1451,15 @@ def main():
         # will eventually make it so each island has an array of weights for each helper function, not just one value
         # will need to experiment with range of weights to see if that causes too much chaos or helps with variation
         # weight = numpy.random.uniform(low=0.1, high=5.0, size=gene_length)
-        #weight = numpy.random.uniform(low=1.0, high=1.0, size=gene_length)
+        
 
-        weight = numpy.random.uniform(low=0.1, high=10.0, size=gene_length)
+
+        # for each member having an array of helper weights, maybe have the intial gen here?
+        # and then change it so single_island only takes a population as a parameter??
+
+        weight = numpy.random.uniform(low=1.0, high=1.0, size=gene_length)
+
+        #weight = numpy.random.uniform(low=0.1, high=10.0, size=gene_length)
         islands[i] = [single_island(empty_pop, weight), weight]
 
         # numpy.random.uniform(low=0.0, high=2500.0, size=gene_length)
@@ -1377,7 +1517,7 @@ def main():
     # then just loop this part until satisfied
 
     # eventually make this range a variable at the top, more modular
-    for i in range(2):
+    for i in range(3):
 
         # island_1 = single_island(island_1, island_1_weight)
         # island_2 = single_island(island_2, island_2_weight)
