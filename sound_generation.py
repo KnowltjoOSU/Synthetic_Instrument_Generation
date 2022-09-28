@@ -57,19 +57,19 @@ class instrument:
 # !!! WARNING the generated wav file can be pretty loud so lower your volume a lot if you listen to it !!!
 
 # Set up Flute representation
-nums = 10
-harms = [0] * nums
+# nums = 10
+# harms = [0] * nums
 
-amps = [1.0, 0.65, 0.61, 0.15, 0.09, 0.02, 0.02, 0.01, 0.01, 0.01]
+# amps = [1.0, 0.65, 0.61, 0.15, 0.09, 0.02, 0.02, 0.01, 0.01, 0.01]
 
-a = [0.01] * nums
-d = [0.1] * nums
-s = [0.5] * nums
-r = [1.5] * nums  
+# a = [0.01] * nums
+# d = [0.1] * nums
+# s = [0.5] * nums
+# r = [1.5] * nums  
 
-freq = 247
-for i in range(nums):
-    harms[i] = (i+1) * freq
+# freq = 247
+# for i in range(nums):
+#     harms[i] = (i+1) * freq
 
 # Also set up the file name and the directory for where you want to put wav file
 
@@ -78,3 +78,25 @@ for i in range(nums):
 
 #randSound = instrument(harms, amps, a, d, s, r, nums, file_name, directory)
 #randSound.play_note()
+
+
+nums = 10
+harms = [0] * nums
+
+amps = [1.0, 0.75, 0.25, 0.125, 0.5, 1.0, 0.5, 0.25, 0.125, 0.5]
+
+a = [0.01] * nums
+d = [0.1] * nums
+s = [0.5] * nums
+r = [1.5] * nums 
+
+freq = 1000
+for i in range(nums):
+    harms[i] = (i+1) * freq
+
+
+# file_name = "basic_sound2.wav"
+# directory = ""
+
+# randSound = instrument(harms, amps, a, d, s, r, nums, file_name, directory)
+# randSound.play_note()
